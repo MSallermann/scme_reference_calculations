@@ -1,0 +1,63 @@
+import itertools
+
+
+configfile: "config/config.json"
+
+
+exponent_max_list = [4, 6, 8]
+exponent_sum_max_list = [5, 9, 12]
+moments_str_list = [
+    "dip_dip",
+    "dip_quad",
+    "dipole",
+    "hexadecapole",
+    "octupole",
+    "quad_quad",
+    "quadrupole",
+]
+
+
+final_files = []
+
+for (exponent_max, exponent_sum_max), moment_str in itertools.product(
+    zip(exponent_max_list, exponent_sum_max_list), moments_str_list
+):
+    final_files.append(
+        f"results/{exponent_max}_{exponent_sum_max}/{moment_str}/result.json"
+    )
+
+
+rule all:
+    input:
+        final_files,
+        "results/aggregated.csv"
+
+
+rule compare_moments:
+    input:
+        scme_expansions_file=config["scme_expansion_file"],
+        fitted_energies_file=config["fitted_energies_file"],
+    output:
+        "results/{exponent_max}_{exponent_sum_max}/{moment_str}/result.json",
+    params:
+        key="component_PBE_fullrange_reflect_{exponent_max}_{exponent_sum_max}/{moment_str}",
+        geometry_key="component_PBE_fullrange_reflect_{exponent_max}_{exponent_sum_max}/geometries/test",
+        results_key="component_PBE_fullrange_reflect_{exponent_max}_{exponent_sum_max}/{moment_str}/test/pred",
+    script:
+        "scripts/compare_moments.py"
+
+
+module scme_ase_workflow:
+    snakefile:
+        github("MSallermann/scme_ase_workflow", path="workflow/Snakefile", tag="v0.0.7")
+    config:
+        config
+use rule * from scme_ase_workflow
+
+use rule aggregate_json as aggregate_moment_expansion_data with:
+    input:
+        final_files
+    params:
+        None
+    output:
+        "results/aggregated.csv"
