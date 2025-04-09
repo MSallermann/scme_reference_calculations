@@ -1,0 +1,240 @@
+from snakemake.utils import min_version
+
+
+configfile: "config/config.json"
+
+
+min_version("6.0")
+from pathlib import Path
+from dataclasses import dataclass
+
+SAMPLES_MONOMER = range(config["sample_start"], config["sample_end"])
+SAMPLES_DIMER = range(1, 60)
+SAMPLES_ICE = [0]
+
+
+rule all:
+    input:
+        "results/monomer/results.json",
+        "results/monomer_old/results.json",
+        "results/monomer/scme_truth.json",
+        "results/dimer/results.json",
+        "results/dimer_old/results.json",
+        "results/dimer/scme_truth.json",
+        "results/ice/results.json",
+        "results/ice/scme_truth.json",
+
+module scme_ase_workflow:
+    snakefile:
+        github("MSallermann/scme_ase_workflow", path="workflow/Snakefile", tag="v0.0.7")
+    config:
+        config
+
+
+use rule * from scme_ase_workflow
+
+
+# ======= BEGIN: Monomer Rules =======
+
+
+use rule run_scme as compare_monomer with:
+    input:
+        xyz_file="resources/scme_input/SCME_truth/PES/Monomer/SCMEf/monomer-{sample}.xyz",
+    output:
+        initial_data="results/monomer/{sample}/data.json",
+    params:
+        ase_params=dict(
+            method="VelocityVerlet",
+            n_iter=0,
+            pbc=[False, False, False],
+            constrain_water=False,
+        ),
+        scme_params=dict(qms=True, dms=True),
+
+
+use rule aggregate_json as aggregate_monomer with:
+    input:
+        expand("results/monomer/{sample}/data.json", sample=SAMPLES_MONOMER),
+    output:
+        "results/monomer/results.json",
+    params:
+        add_columns=dict(sample=SAMPLES_MONOMER),
+        ignore_columns=["file"],
+
+
+rule aggregate_scme_truth_monomer:
+    params:
+        base_path=Path("./resources/scme_input/SCME_truth/PES/Monomer/SCMEf").resolve(),
+        prefix="monomer-",
+        samples=SAMPLES_MONOMER,
+    output:
+        "results/monomer/scme_truth.json",
+    script:
+        "scripts/aggregate_scme_truth.py"
+
+
+rule compare_monomer_old:
+    input:
+        xyz_file="resources/scme_input/SCME_truth/PES/Monomer/SCMEf/monomer-{sample}.xyz",
+    output:
+        initial_data="results/monomer_old/{sample}/data.json",
+    params:
+        ase_params=dict(
+            method="VelocityVerlet",
+            n_iter=0,
+            pbc=[False, False, False],
+            constrain_water=False,
+        ),
+        scme_params=dict(irigidmolecules=False),
+    script:
+        "scripts/run_old_scme.py"
+
+
+use rule aggregate_json as aggregate_monomer_old with:
+    input:
+        expand("results/monomer_old/{sample}/data.json", sample=SAMPLES_MONOMER),
+    output:
+        "results/monomer_old/results.json",
+    params:
+        add_columns=dict(sample=SAMPLES_MONOMER),
+        ignore_columns=["file"],
+
+
+# ======= End: Monomer Rules =======
+
+# ======= Begin: Dimer Rules =======
+
+from ase.units import Bohr
+
+
+use rule run_scme as compare_dimer with:
+    input:
+        xyz_file="resources/scme_input/SCME_truth/PES/Dimer/Cs/SCMEf/dimer-{sample}.xyz",
+    output:
+        initial_data="results/dimer/{sample}/data.json",
+        initial_dipoles="results/dimer/{sample}/dipoles.npy",
+        initial_quadrupoles="results/dimer/{sample}/quadrupoles.npy",
+    resources:
+        cpus_per_task=1,
+    params:
+        ase_params=dict(
+            method="VelocityVerlet",
+            n_iter=0,
+            pbc=[False, False, False],
+            constrain_water=False,
+        ),
+        scme_params=dict(
+            qms=True,
+            dms=True,
+            scf_convcrit=1e-7,
+            rc_Elec=11.0 / Bohr,
+            rc_Core=1000,
+            rc_Disp=1000,
+        ),
+
+
+use rule aggregate_json as aggregate_dimer with:
+    input:
+        expand("results/dimer/{sample}/data.json", sample=SAMPLES_DIMER),
+    output:
+        "results/dimer/results.json",
+    params:
+        add_columns=dict(sample=SAMPLES_DIMER),
+        ignore_columns=["file"],
+
+
+rule aggregate_scme_truth_dimer:
+    params:
+        base_path=Path("resources/scme_input/SCME_truth/PES/Dimer/Cs/SCMEf").resolve(),
+        prefix="dimer-",
+        samples=SAMPLES_DIMER,
+    output:
+        "results/dimer/scme_truth.json",
+    script:
+        "scripts/aggregate_scme_truth.py"
+
+
+rule compare_dimer_old:
+    input:
+        xyz_file="resources/scme_input/SCME_truth/PES/Dimer/Cs/SCMEf/dimer-{sample}.xyz",
+    output:
+        initial_data="results/dimer_old/{sample}/data.json",
+    params:
+        ase_params=dict(
+            method="VelocityVerlet",
+            n_iter=0,
+            pbc=[False, False, False],
+            constrain_water=False,
+        ),
+        scme_params=dict(irigidmolecules=False, rc_Elec=11.0 / Bohr),
+    script:
+        "scripts/run_old_scme.py"
+
+
+use rule aggregate_json as aggregate_dimer_old with:
+    input:
+        expand("results/dimer_old/{sample}/data.json", sample=SAMPLES_DIMER),
+    output:
+        "results/dimer_old/results.json",
+    params:
+        add_columns=dict(sample=SAMPLES_DIMER),
+        ignore_columns=["file"],
+
+
+# ======= End: Dimer Rules =======
+
+# ======= Begin: Ice Rules =======
+
+from ase.units import Bohr
+
+
+use rule run_scme as compare_ice with:
+    input:
+        xyz_file="resources/scme_input/SCME_truth/Crystals/Ice-IH/SCMEf/NEW/ice-{sample}.xyz",
+    output:
+        initial_data="results/ice/{sample}/data.json",
+        final_dipoles="results/ice/{sample}/dipoles.npy",
+        final_quadrupoles="results/ice/{sample}/quadrupoles.npy",
+        logfile="results/ice/{sample}/log.txt",
+    params:
+        ase_params=dict(
+            method="Fire",
+            n_iter=0,
+            fmax=0.0001,
+            pbc=[True, True, True],
+            constrain_water=False,
+        ),
+        scme_params=dict(
+            qms=True,
+            dms=True,
+            scf_convcrit=1e-7,
+            rc_Elec=11.0 / Bohr,
+            rc_Core=1000,
+            rc_Disp=1000,
+        ),
+
+
+use rule aggregate_json as aggregate_ice with:
+    input:
+        expand("results/ice/{sample}/data.json", sample=SAMPLES_ICE),
+    output:
+        "results/ice/results.json",
+    params:
+        add_columns=dict(sample=SAMPLES_ICE),
+        ignore_columns=["file"],
+
+
+rule aggregate_scme_truth_ice:
+    params:
+        base_path=Path(
+            "resources/scme_input/SCME_truth/Crystals/Ice-IH/SCMEf/NEW"
+        ).resolve(),
+        prefix="ice-",
+        samples=SAMPLES_ICE,
+    output:
+        "results/ice/scme_truth.json",
+    script:
+        "scripts/aggregate_scme_truth.py"
+
+
+# ======= End: Ice Rules =======
