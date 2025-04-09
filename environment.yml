@@ -1,4 +1,4 @@
-name: scme_reference_calculations
+name: scme_reference_calculations_env
 channels:
   - conda-forge
   - bioconda
