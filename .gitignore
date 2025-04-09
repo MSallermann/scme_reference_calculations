@@ -1,0 +1,6 @@
+.snakemake/
+energy_conservation/results/*
+*.json
+*.png
+*.npy
+*.html

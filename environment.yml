@@ -1,0 +1,19 @@
+name: scme_reference_calculations
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python>=3.10
+  - ase>=3.22.1
+  - numpy>=1.26.4
+  - scipy>=1.7.3
+  - pandas
+  - snakemake
+  - moltemplate
+  - packmol
+  - matplotlib
+  - pip
+  - pydantic
+  - h5py
+pip: 
+  - snakemake-executor-plugin-cluster-generic
