@@ -147,6 +147,9 @@ class MonomerEnergy:
         self.mO = mO
         self.mH = mH
 
+        self.box = pyscme.SimulationBoxInfo()
+        self.box.pbc = [False, False, False]
+
         self.expansion = pyscme.monomer.MonomerEnergy(
             r_e, theta_e, coeffs, exponents_i, exponents_j, exponents_k
         )

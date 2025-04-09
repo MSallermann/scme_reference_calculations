@@ -1,6 +1,10 @@
 .snakemake/
 energy_conservation/results/*
+compare_against_fortran_code/results/*
+compare_moment_expansions/results/*
 *.json
 *.png
 *.npy
 *.html
+
+*.pyc

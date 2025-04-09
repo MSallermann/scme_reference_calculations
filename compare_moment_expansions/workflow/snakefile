@@ -30,7 +30,9 @@ for (exponent_max, exponent_sum_max), moment_str in itertools.product(
 rule all:
     input:
         final_files,
-        "results/aggregated.csv"
+        "results/aggregated.csv",
+        "results/energy/result.json"
+
 
 
 rule compare_moments:
@@ -45,6 +47,19 @@ rule compare_moments:
         results_key="component_PBE_fullrange_reflect_{exponent_max}_{exponent_sum_max}/{moment_str}/test/pred",
     script:
         "scripts/compare_moments.py"
+
+rule compare_energies:
+    input:
+        scme_expansions_file = config["scme_expansion_file"],
+        fitted_energies_file = config["fitted_energies_file"],
+    output:
+        "results/energy/result.json"
+    params:
+        key = "energy",
+        geometry_key = "energy/geometries/test",
+        results_key = "energy/test/pred"
+    script:
+        "scripts/compare_monomer_energy.py"
 
 
 module scme_ase_workflow:
