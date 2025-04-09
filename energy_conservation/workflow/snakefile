@@ -1,0 +1,57 @@
+from dataclasses import dataclass
+
+
+include: "rules/aggregate.smk"
+include: "rules/scme.smk"
+
+
+total_time = 128  # fs
+time_steps = [0.125, 0.25, 0.5, 1, 2, 4]  # fs
+n_iter = [int(total_time / dt) for dt in time_steps]
+
+
+@dataclass
+class Params:
+    n_iter: int
+    dt: float
+
+
+INPUT_DICT = dict()
+for dt, n in zip(time_steps, n_iter):
+    INPUT_DICT[f"t_{total_time:.3f}_dt_{dt:.3f}"] = Params(n_iter=n, dt=dt)
+
+SAMPLES = INPUT_DICT.keys()
+
+
+rule all:
+    input:
+        expand("results/energy_conservation/{sample}/initial.json", sample=SAMPLES),
+        expand("results/energy_conservation/{sample}/final.json", sample=SAMPLES),
+        "results/final.csv",
+
+
+use rule run_scme as run_scme_energy_conservation with:
+    input:
+        xyz_file="resources/surface_seed_1_48.xyz",
+    output:
+        xyz_file="results/energy_conservation/{sample}/final.xyz",
+        initial_data="results/energy_conservation/{sample}/initial.json",
+        final_data="results/energy_conservation/{sample}/final.json",
+    threads: 1
+    params:
+        method="VelocityVerlet",
+        n_iter=lambda wc: INPUT_DICT[wc.sample].n_iter,
+        fmax=0.01,
+        timestep=lambda wc: INPUT_DICT[wc.sample].dt,
+        temperature=300,
+        pbc=[False, False, False],
+        logfile="results/{sample}/log.txt",
+
+
+use rule aggregate_json as aggregate_energy with:
+    input:
+        expand(rules.run_scme_energy_conservation.output.final_data, sample=SAMPLES),
+    output:
+        "results/energy_conservation/final.csv",
+    params:
+        added_columns=dict(timestep=[INPUT_DICT[sample].dt for sample in SAMPLES]),
