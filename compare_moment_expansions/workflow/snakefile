@@ -4,6 +4,10 @@ import itertools
 configfile: "config/config.json"
 
 
+results_folder = Path(config["results_folder"]).resolve()
+resource_folder = Path(config["resources_folder"]).resolve()
+
+
 exponent_max_list = [4, 6, 8]
 exponent_sum_max_list = [5, 9, 12]
 moments_str_list = [
@@ -15,51 +19,56 @@ moments_str_list = [
     "quad_quad",
     "quadrupole",
 ]
+functional_list = ["PBE", "BEEF", "BLYP", "RPBE"]
 
 
 final_files = []
 
-for (exponent_max, exponent_sum_max), moment_str in itertools.product(
-    zip(exponent_max_list, exponent_sum_max_list), moments_str_list
+for (exponent_max, exponent_sum_max), functional, moment_str in itertools.product(
+    zip(exponent_max_list, exponent_sum_max_list), functional_list, moments_str_list
 ):
     final_files.append(
-        f"results/{exponent_max}_{exponent_sum_max}/{moment_str}/result.json"
+        results_folder
+        / f"{exponent_max}_{exponent_sum_max}_{functional}/{moment_str}/result.json"
     )
 
 
 rule all:
     input:
         final_files,
-        "results/aggregated.csv",
-        "results/energy/result.json"
-
+        results_folder / "aggregated.csv",
+        # "results/energy/result.json"
 
 
 rule compare_moments:
     input:
-        scme_expansions_file=config["scme_expansion_file"],
-        fitted_energies_file=config["fitted_energies_file"],
+        scme_expansions_file=resource_folder / "scme_expansions_{functional}.hdf5",
+        fitted_energies_file=resource_folder / "fitted_expansions_{functional}.hdf5",
     output:
-        "results/{exponent_max}_{exponent_sum_max}/{moment_str}/result.json",
+        results_folder
+        / "{exponent_max}_{exponent_sum_max}_{functional}/{moment_str}/result.json",
     params:
-        key="component_PBE_fullrange_reflect_{exponent_max}_{exponent_sum_max}/{moment_str}",
-        geometry_key="component_PBE_fullrange_reflect_{exponent_max}_{exponent_sum_max}/geometries/test",
-        results_key="component_PBE_fullrange_reflect_{exponent_max}_{exponent_sum_max}/{moment_str}/test/pred",
+        key="component_{functional}_fullrange_reflect_{exponent_max}_{exponent_sum_max}/{moment_str}",
+        geometry_key="component_{functional}_fullrange_reflect_{exponent_max}_{exponent_sum_max}/geometries/test",
+        results_key="component_{functional}_fullrange_reflect_{exponent_max}_{exponent_sum_max}/{moment_str}/test/pred",
+        functional = "{functional}",
+        moment = "{moment_str}"
     script:
         "scripts/compare_moments.py"
 
-rule compare_energies:
-    input:
-        scme_expansions_file = config["scme_expansion_file"],
-        fitted_energies_file = config["fitted_energies_file"],
-    output:
-        "results/energy/result.json"
-    params:
-        key = "energy",
-        geometry_key = "energy/geometries/test",
-        results_key = "energy/test/pred"
-    script:
-        "scripts/compare_monomer_energy.py"
+
+# rule compare_energies:
+#     input:
+#         scme_expansions_file= resource_folder / "/params_energy_monomer.hdf5",
+#         fitted_energies_file=config["fitted_energies_file"],
+#     output:
+#         "results/energy/result.json",
+#     params:
+#         key="energy",
+#         geometry_key="energy/geometries/test",
+#         results_key="energy/test/pred",
+#     script:
+#         "scripts/compare_monomer_energy.py"
 
 
 module scme_ase_workflow:
@@ -67,12 +76,15 @@ module scme_ase_workflow:
         github("MSallermann/scme_ase_workflow", path="workflow/Snakefile", tag="v0.0.7")
     config:
         config
+
+
 use rule * from scme_ase_workflow
+
 
 use rule aggregate_json as aggregate_moment_expansion_data with:
     input:
-        final_files
+        final_files,
     params:
-        None
+        ignore_columns = ["avg_moment_scme", "avg_moment_reference", "file"],
     output:
-        "results/aggregated.csv"
+        results_folder / "aggregated.csv",

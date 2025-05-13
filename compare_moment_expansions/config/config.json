@@ -1,4 +1,4 @@
 {
-    "scme_expansion_file": "/home/moritz/SCME/scme_reference_calculations/compare_moment_expansions/resources/scme_expansions.hdf5",
-    "fitted_energies_file": "/home/moritz/SCME/scme_reference_calculations/compare_moment_expansions/resources/fitted_energies.hdf5"
+    "results_folder": "./results",
+    "resources_folder": "/home/moritz/SCME/scme_reference_calculations/compare_moment_expansions/resources"
 }

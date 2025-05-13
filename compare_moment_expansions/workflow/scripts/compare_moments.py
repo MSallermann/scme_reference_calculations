@@ -2,7 +2,7 @@ from pathlib import Path
 import h5py
 import numpy as np
 import numpy.typing as npt
-
+from typing import Optional
 from lib.util import MomentExpansion, comp_str_to_indices
 
 from ase.units import Bohr
@@ -16,6 +16,8 @@ def main(
     geometry_key: str,
     results_key: str,
     output_path: Path,
+    functional: Optional[str] = None,
+    moment_str: Optional[str] = None,
 ):
     # =========== Construct the moment expansion ===========
     scme_expansions_hdf5_file = h5py.File(scme_expansion_hdf5, "r")
@@ -27,7 +29,7 @@ def main(
     exponents_k = np.array(scme_expansion["exponents_k"], dtype=int)
 
     # SCME uses Bohr and radians
-    r_e =     np.array(scme_expansion["r_e"])
+    r_e = np.array(scme_expansion["r_e"])
     theta_e = np.array(scme_expansion["theta_e"])
 
     expansion = MomentExpansion(
@@ -47,8 +49,10 @@ def main(
     # record the maximum difference in any moment component
     max_diff = 0
     diffs = []
-    for (rOH1, rOH2, theta_deg), moment in zip(geometries, results):
 
+    moments_scme = []
+
+    for (rOH1, rOH2, theta_deg), moment in zip(geometries, results):
         # SCME uses Bohr and radians, so we transform the units before computing the moment
         rOH1_scme = rOH1 / Bohr
         rOH2_scme = rOH2 / Bohr
@@ -58,19 +62,30 @@ def main(
 
         for i, m_component in enumerate(moment):
             m_component_scme = moment_scme[indices[i]]
+            moments_scme.append(moment_scme)
             diffs.append(np.abs(m_component - m_component_scme))
+
+    avg_moment_scme = np.mean(moments_scme, axis=0).tolist()
+    avg_moment_reference = np.mean(results, axis=0).tolist()
 
     max_diff = np.max(diffs)
     mean_diff = np.mean(diffs)
     std_diff = np.std(diffs)
 
     with open(output_path, "w") as f:
-        res = dict(max_diff=max_diff, mean_diff=mean_diff, std_diff=std_diff)
+        res = dict(
+            max_diff=max_diff,
+            mean_diff=mean_diff,
+            std_diff=std_diff,
+            functional=functional,
+            moment=moment_str,
+            avg_moment_scme=avg_moment_scme,
+            avg_moment_reference=avg_moment_reference,
+        )
         json.dump(res, f, indent=4)
 
 
 if __name__ == "__main__":
-
     if "snakemake" in globals():
         from snakemake.script import snakemake
 
@@ -81,6 +96,8 @@ if __name__ == "__main__":
             geometry_key=snakemake.params["geometry_key"],
             results_key=snakemake.params["results_key"],
             output_path=snakemake.output[0],
+            functional=snakemake.params["functional"],
+            moment_str=snakemake.params["moment"]
         )
     else:
         scme_expansion_hdf5 = Path(
